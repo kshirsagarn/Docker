@@ -1,0 +1,10 @@
+version: '3'
+
+services:
+  db:
+    image: mariadb:10.6.4-focal
+  wordpress:
+    image: worldpress:latest
+    ports:
+      - 80:80
+    restart: always
