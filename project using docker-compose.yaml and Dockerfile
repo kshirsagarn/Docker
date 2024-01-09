@@ -1,0 +1,134 @@
+•	https://learning-ocean.com/tutorials/docker-compose/docker-compose-imagebuilddockerfile
+Docker-compose Image, Build, Dockerfile
+
+How to build a sample project using docker-compose.yaml and Dockerfile?
+
+As shown below trying to build a small python_redis project which has 3 files:
+ 
+
+Let’s understand the simple Dockerfile, which we will use to build the project.
+FROM python:3.4
+ADD . /code
+WORKDIR /code
+RUN pip install -r requirements.txt
+CMD ["python", "app.py"]
+
+FROM: It tells that which image needs to pick to build a container. In our case, we are building a small project which has python version 3.4.
+ADD: It will copy the host content from the specified directory to the container. A shown above from the present working directory copying everything to the container inside /code directory.
+WORKDIR: Whenever the container comes up the default working directory will be set to the directory given in workdir.
+RUN: It will install all the required modules which is mentioned in the requirement.txt file 
+CMD: It will run the specified command in the list inside the container .
+
+requirements.txt file has below contant. 
+flask
+redis
+
+app.py file has below containent: 
+import os
+import time
+import redis
+from flask import Flask
+
+app = Flask(__name__)
+cache = redis.Redis(host='redis', port=6379)
+
+def get_hit_count():
+    retries = 5
+    while True:
+        try:
+            return cache.incr('hits')
+        except redis.exceptions.ConnectionError as exc:
+            if retries == 0:
+                raise exc
+            retries -= 1
+            time.sleep(0.5)
+
+@app.route('/')
+def hello():
+    count = get_hit_count()
+    return 'Hello World! I have been seen {} times.\n'.format(count)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0")
+
+Now,let’s look at the docker-compose yaml file 
+version: '3'
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+  redis:
+    image: "redis:alpine"
+
+In services property we have specified web which is our container name and build is given as dot(.) means present working directory, it searches for Dockerfile inside the current directory and build an image.
+We have exposed port 5000 of the host to the 5000 port of the container. Redis is another container database container that has only images.
+
+So, now we have all the files present in our working directory
+gaurav@learning-ocean:~/python_redis$ ls
+app.py  docker-compose.yml  Dockerfile  requirements.txt
+Let’s run now docker-compose up -d 
+gaurav@learning-ocean:~/python_redis$ docker-compose up -d
+Building web
+Sending build context to Docker daemon  5.632kB
+Step 1/5 : FROM python:3.4
+3.4: Pulling from library/python
+22dbe790f715: Pulling fs layer
+0250231711a0: Pulling fs layer
+6fba9447437b: Pulling fs layer
+c2b4d327b352: Pulling fs layer
+.... output removed.... 
+
+Status: Downloaded newer image for redis:alpine
+Creating python_redis_web_1   ... done
+Creating python_redis_redis_1 ... done
+
+Now,try to access application at port 5000 
+ 
+
+Every time when you reload the URL the count gets incremented and will be stored and taken care of by the Redis database which we have used.
+
+The newly build image will also be visible in the list of images using docker image ls 
+gaurav@learning-ocean:~/python_redis$ docker image ls
+REPOSITORY         TAG       IMAGE ID       CREATED          SIZE
+python_redis_web   latest    c27390e2728f   59 seconds ago   935MB
+nginx              latest    ad4c705f24d3   10 days ago      133MB
+mysql              5.7       1d7aba917169   2 weeks ago      448MB
+ansible            latest    c1401d45b590   3 weeks ago      303MB
+redis              alpine    f6f2296798e9   3 weeks ago      32.3MB
+jenkins/jenkins    lts       3b4ec91827f2   7 weeks ago      568MB
+ubuntu             latest    1318b700e415   7 weeks ago      72.8MB
+python             3.4       8c62b065252f   2 years ago      924MB
+gaurav@learning-ocean:~/python_redis$
+
+How to push this image inside your docker hub account?
+The answer to this question is that we have to change the image name like dockerhubusername/reponame:tag 
+
+so how can we do that ? 
+use the below docker-compose.yaml file 
+version: '3'
+services:
+ web:
+  build: .
+  image: 'coolgourav147/mypythonimage'
+  ports:
+   - "5000:5000"
+ redis:
+  image: "redis:alpine"
+
+build the image using below command 
+gaurav@learning-ocean:~/python_redis$ docker-compose build
+
+check the output of docker image ls command
+gaurav@learning-ocean:~/python_redis$ docker image ls
+REPOSITORY                    TAG       IMAGE ID       CREATED          SIZE
+coolgourav147/mypythonimage   latest    6237e93c0da4   13 seconds ago   935MB
+python_redis_web              latest    c27390e2728f   6 minutes ago    935MB
+nginx                         latest    ad4c705f24d3   10 days ago      133MB
+mysql                         5.7       1d7aba917169   2 weeks ago      448MB
+ansible                       latest    c1401d45b590   3 weeks ago      303MB
+redis                         alpine    f6f2296798e9   3 weeks ago      32.3MB
+jenkins/jenkins               lts       3b4ec91827f2   7 weeks ago      568MB
+ubuntu                        latest    1318b700e415   7 weeks ago      72.8MB
+python                        3.4       8c62b065252f   2 years ago      924MB
+gaurav@learning-ocean:~/python_redis$
+•	
